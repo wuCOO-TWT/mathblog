@@ -66,8 +66,8 @@ export default function About() {
             <section className="mt-8">
               <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">研究与计算方向</h2>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-zinc-600 dark:text-zinc-300">
-                <li>方向占位 1</li>
-                <li>方向占位 2</li>
+                <li>量子计算与人工智能</li>
+                <li>量子张量网络压缩与机器学习</li>
                 <li>方向占位 3</li>
               </ul>
             </section>
