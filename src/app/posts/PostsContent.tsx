@@ -16,7 +16,7 @@ export default function PostsContent({ posts }: { posts: Post[] }) {
   return (
     <main className="flex-1">
       {/* ===== 全页固定背景 ===== */}
-      <div className="fixed inset-0 -z-10 bg-[url('/posts-bg.jpg')] bg-cover bg-center bg-no-repeat">
+      <div className="fixed inset-0 -z-10 bg-[url('/mathblog/posts-bg.jpg')] bg-cover bg-center bg-no-repeat">
         <div className="absolute inset-0 dark:bg-black/45" />
       </div>
 

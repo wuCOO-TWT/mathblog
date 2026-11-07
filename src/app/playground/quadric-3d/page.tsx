@@ -16,7 +16,7 @@ export default function Quadric3DPage() {
           （避免百分比高度在 flex 链中解析失败、回退成 iframe 默认 150px） */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
         <iframe
-          src="/demos/quadric-3d.html"
+          src="/mathblog/demos/quadric-3d.html"
           title="二次型 3D 可视化"
           className="min-h-0 w-full flex-1"
         />

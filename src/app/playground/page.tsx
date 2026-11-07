@@ -5,7 +5,7 @@ export default function Playground() {
   return (
     <main className="flex-1">
       {/* ===== 全页固定星空背景 ===== */}
-      <div className="fixed inset-0 -z-10 bg-[url('/playground-bg.jpg')] bg-cover bg-center bg-no-repeat">
+      <div className="fixed inset-0 -z-10 bg-[url('/mathblog/playground-bg.jpg')] bg-cover bg-center bg-no-repeat">
         <div className="absolute inset-0 bg-black/30" />
       </div>
 

@@ -22,11 +22,11 @@ export default function EquivToTaylorPage() {
         </div>
 
         {/* PDF.js 渲染的在线阅读器（不依赖浏览器内置 PDF 插件） */}
-        <PdfViewer file="/posts/equiv-to-taylor.pdf" />
+        <PdfViewer file="/mathblog/posts/equiv-to-taylor.pdf" />
 
         {/* 兜底：在新标签页打开 / 下载 */}
         <a
-          href="/posts/equiv-to-taylor.pdf"
+          href="/mathblog/posts/equiv-to-taylor.pdf"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline dark:text-indigo-400"

@@ -24,7 +24,7 @@ const tracks: Track[] = [
 ];
 
 // 文件名可能含中文/空格/&，需做 URL 编码
-const srcOf = (file: string) => "/music/" + encodeURIComponent(file);
+const srcOf = (file: string) => "/mathblog/music/" + encodeURIComponent(file);
 
 function formatTime(sec: number) {
   if (!Number.isFinite(sec) || sec <= 0) return "0:00";
@@ -140,7 +140,7 @@ export default function MusicPlayerCard() {
       {/* 封面 + 歌名 */}
       <div className="mt-3 flex items-center gap-3">
         <Image
-          src="/cover.jpg"
+          src="/mathblog/cover.jpg"
           alt="专辑封面"
           width={64}
           height={64}

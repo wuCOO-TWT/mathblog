@@ -29,7 +29,7 @@ export default function About() {
   return (
     <main className="flex-1">
       {/* ===== 全页固定背景 ===== */}
-      <div className="fixed inset-0 -z-10 bg-[url('/about-bg.jpg')] bg-cover bg-center bg-no-repeat">
+      <div className="fixed inset-0 -z-10 bg-[url('/mathblog/about-bg.jpg')] bg-cover bg-center bg-no-repeat">
         <div className="absolute inset-0 dark:bg-black/40" />
       </div>
 
@@ -41,7 +41,7 @@ export default function About() {
           <div className="px-6 pb-8 sm:px-10">
             {/* 头像（占位，叠在横幅上） */}
             <Image
-              src="/avatar.jpg"
+              src="/mathblog/avatar.jpg"
               alt="吴明泽的头像"
               width={96}
               height={96}

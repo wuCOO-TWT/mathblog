@@ -7,7 +7,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 // pdf.js 需要单独的 worker 脚本。这里指向 public/ 下的副本，
 // 避免打包器处理 worker 时的兼容性问题。
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+pdfjs.GlobalWorkerOptions.workerSrc = "/mathblog/pdf.worker.min.mjs";
 
 export default function PdfDocument({ file }: { file: string }) {
   const containerRef = useRef<HTMLDivElement>(null);

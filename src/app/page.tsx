@@ -28,7 +28,7 @@ export default function Home() {
   return (
     <main className="relative flex-1">
       {/* ===================== 全页固定背景（原图直出，避免放大失真） ===================== */}
-      <div className="fixed inset-0 -z-10 bg-[url('/home-bg.jpg')] bg-cover bg-center bg-no-repeat">
+      <div className="fixed inset-0 -z-10 bg-[url('/mathblog/home-bg.jpg')] bg-cover bg-center bg-no-repeat">
         {/* 轻微遮罩：仅暗色模式保留，亮色模式除雾让背景更清晰 */}
         <div className="absolute inset-0 dark:bg-black/40" />
       </div>
@@ -51,7 +51,7 @@ export default function Home() {
           <div className="rounded-2xl border border-black/10 bg-white/75 p-5 backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/65">
             <div className="flex items-center gap-4">
               <Image
-                src="/avatar.jpg"
+                src="/mathblog/avatar.jpg"
                 alt="吴明泽的头像"
                 width={64}
                 height={64}
