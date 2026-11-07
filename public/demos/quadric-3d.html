@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>二次型 3D 可视化 · 从椭球到降维</title>
+
+  <!-- ===== 数学公式渲染：KaTeX（本地引入）=====
+       如需改用 CDN：
+       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+       <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script> -->
+  <link rel="stylesheet" href="/libs/katex/katex.min.css" />
+  <script src="/libs/katex/katex.min.js"></script>
+
+  <!-- ===== Three.js（本地引入，import map + ES Module）=====
+       如需改用 CDN：
+       "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/" -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/libs/three/three.module.js",
+        "three/addons/": "/libs/three/addons/"
+      }
+    }
+  </script>
+
+  <style>
+    /* ========== 深色现代界面 ========== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #0b1220; color: #e2e8f0;
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; }
+    #app { display: flex; height: 100%; }
+
+    /* 左侧 3D 画布 */
+    #canvas-container { flex: 1; min-width: 0; position: relative; background: #0b1220; }
+    #hint { position: absolute; left: 14px; bottom: 12px; font-size: 12px; color: #64748b; pointer-events: none; }
+
+    /* 右侧控制面板 */
+    #panel { width: 400px; flex-shrink: 0; background: #0f172a; border-left: 1px solid #1e293b;
+      overflow-y: auto; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+    #panel h1 { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+    #panel h2 { font-size: 15px; font-weight: 600; color: #cbd5e1; }
+    .sub { font-size: 12px; color: #64748b; line-height: 1.6; }
+
+    /* KaTeX 展示块 */
+    .tex-block { background: #111c30; border: 1px solid #1e293b; border-radius: 10px;
+      padding: 12px 14px; overflow-x: auto; text-align: center; color: #e2e8f0; }
+    .eq-line { font-size: 13px; color: #94a3b8; text-align: center; }
+    .eq-line .dim { color: #64748b; margin-right: 6px; }
+
+    /* 滑动条 */
+    .row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+    .row label { width: 26px; font-weight: 700; color: #7dd3fc; font-size: 15px; }
+    .row input[type="range"] { flex: 1; accent-color: #38bdf8; }
+    .row .val { width: 48px; text-align: right; font-variant-numeric: tabular-nums; color: #cbd5e1; font-size: 13px; }
+
+    /* 按钮 */
+    .buttons { display: flex; gap: 10px; }
+    button { flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid #334155;
+      background: #1e293b; color: #e2e8f0; font-size: 13px; cursor: pointer; transition: background .15s; }
+    button:hover { background: #334155; }
+
+    /* 状态提示 */
+    .note { font-size: 13px; line-height: 1.7; padding: 10px 12px; border-radius: 8px;
+      background: #111c30; border: 1px solid #1e293b; color: #94a3b8; }
+    .note.warn { color: #fca5a5; border-color: #7f1d1d; background: #1c0f14; }
+    .sep { border: none; border-top: 1px solid #1e293b; }
+
+    /* 小屏：面板移到下方 */
+    @media (max-width: 860px) {
+      #app { flex-direction: column; }
+      #canvas-container { flex: 1; }
+      #panel { width: 100%; max-height: 46%; border-left: none; border-top: 1px solid #1e293b; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <div id="hint">鼠标拖拽旋转 · 滚轮缩放 · 右键平移</div>
+    </div>
+
+    <div id="panel">
+      <h1>二次型 3D 可视化</h1>
+      <p class="sub">[x, y, z] M [x, y, z]ᵀ = 1　·　A=B=C=1 时为单位球；参数为 0 时发生降维。</p>
+
+      <!-- 实时矩阵展示（KaTeX） -->
+      <div class="tex-block" id="matrix-display"></div>
+      <div class="eq-line"><span class="dim">当前对应方程：</span><span id="equation-note"></span></div>
+
+      <!-- A、B、C 滑动条 -->
+      <div class="row"><label for="slider-a">A</label><input id="slider-a" type="range" min="0" max="5" step="0.1" value="1" /><span id="val-a" class="val">1</span></div>
+      <div class="row"><label for="slider-b">B</label><input id="slider-b" type="range" min="0" max="5" step="0.1" value="1" /><span id="val-b" class="val">1</span></div>
+      <div class="row"><label for="slider-c">C</label><input id="slider-c" type="range" min="0" max="5" step="0.1" value="1" /><span id="val-c" class="val">1</span></div>
+
+      <!-- 降维状态提示 -->
+      <div id="dimension-note" class="note"></div>
+
+      <hr class="sep" />
+
+      <!-- 任意化：旋转与回归标准 -->
+      <h2>任意化：旋转与回归标准</h2>
+      <p class="sub">绕 y 轴旋转 θ 角，对应矩阵乘法 R(θ)ᵀ diag(A,B,C) R(θ)。θ=0 即回归标准（对角）形式。</p>
+      <div class="row"><label for="slider-theta">θ</label><input id="slider-theta" type="range" min="0" max="360" step="1" value="0" /><span id="val-theta" class="val">0°</span></div>
+      <div class="buttons">
+        <button id="btn-random" type="button">随机旋转</button>
+        <button id="btn-standard" type="button">回归标准形式</button>
+      </div>
+      <div class="tex-block" id="rotation-display"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* ==================== 全局参数 ==================== */
+    let A = 1, B = 1, C = 1;   // 对角矩阵参数
+    let theta = 0;             // 绕 y 轴旋转角（弧度），用于“任意化”
+    let modePrev = null;       // 上一次的降维模式
+    let thetaTweenId = null;   // θ 动画句柄
+
+    // 一位小数显示（与滑动条步长 0.1 一致）
+    const fmt = (v) => String(Math.round(v * 10) / 10);
+
+    /* ==================== 场景初始化 ==================== */
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1220);
+
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.set(5, 4, 6.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    // 灯光：环境光 + 平行光，照亮半透明曲面
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(6, 10, 6);
+    scene.add(dirLight);
+
+    // 轨道控制器：旋转 / 缩放 / 平移
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 22;
+
+    /* ==================== 坐标轴与网格 ==================== */
+    const AXIS_L = 4.2;
+
+    // 文字标签 sprite（x / y / z 标注）
+    function makeLabel(text, color) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = color;
+      ctx.font = 'bold 40px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 32, 32);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.55, 0.55, 1);
+      return sprite;
+    }
+
+    // 三根坐标轴（x 红 / y 绿 / z 蓝），带箭头与标签
+    function addAxes() {
+      const defs = [
+        { dir: new THREE.Vector3(1, 0, 0), color: 0xef4444, label: 'x' },
+        { dir: new THREE.Vector3(0, 1, 0), color: 0x22c55e, label: 'y' },
+        { dir: new THREE.Vector3(0, 0, 1), color: 0x3b82f6, label: 'z' },
+      ];
+      defs.forEach(({ dir, color, label }) => {
+        // 负半轴（半透明，与正半轴区分）
+        const negGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), dir.clone().multiplyScalar(-AXIS_L)]);
+        scene.add(new THREE.Line(negGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35 })));
+        // 正半轴
+        const posGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), dir.clone().multiplyScalar(AXIS_L)]);
+        scene.add(new THREE.Line(posGeo, new THREE.LineBasicMaterial({ color })));
+        // 箭头
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.32, 16), new THREE.MeshBasicMaterial({ color }));
+        cone.position.copy(dir.clone().multiplyScalar(AXIS_L + 0.16));
+        cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        scene.add(cone);
+        // 轴标签
+        const sprite = makeLabel(label, '#' + color.toString(16).padStart(6, '0'));
+        sprite.position.copy(dir.clone().multiplyScalar(AXIS_L + 0.72));
+        scene.add(sprite);
+      });
+    }
+
+    // 三个坐标平面上的网格辅助线
+    function addGrids() {
+      const g1 = new THREE.GridHelper(8, 8, 0x64748b, 0x1e293b); // x-z 平面（默认朝向）
+      g1.material.transparent = true; g1.material.opacity = 0.35;
+      scene.add(g1);
+      const g2 = new THREE.GridHelper(8, 8, 0x64748b, 0x1e293b);
+      g2.rotation.x = Math.PI / 2;                                // x-y 平面
+      g2.material.transparent = true; g2.material.opacity = 0.16;
+      scene.add(g2);
+      const g3 = new THREE.GridHelper(8, 8, 0x64748b, 0x1e293b);
+      g3.rotation.z = Math.PI / 2;                                // y-z 平面
+      g3.material.transparent = true; g3.material.opacity = 0.16;
+      scene.add(g3);
+    }
+
+    addAxes();
+    addGrids();
+
+    /* ==================== 曲面材质（半透明，全部图形共享） ==================== */
+    const surfaceMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+      depthWrite: false,   // 不写深度，便于看到内部坐标轴
+      roughness: 0.35,
+      metalness: 0.15,
+    });
+
+    /* ==================== 图形容器 ==================== */
+    const shapeGroup = new THREE.Group();
+    const rotGroup = new THREE.Group();   // 内层：绕 y 轴旋转，实现“任意化”
+    shapeGroup.add(rotGroup);
+    scene.add(shapeGroup);
+
+    /* ================================================================
+     * 降维判定核心逻辑
+     * ----------------------------------------------------------------
+     * 二次型 xᵀ diag(A,B,C) x = 1：
+     *   A,B,C 全不为 0 → 三维椭球，半轴 1/√A、1/√B、1/√C；
+     *   恰有一个为 0   → 降维成对应坐标平面内的“填充椭圆”
+     *                    （如 A=0：y-z 平面上的椭圆 B y² + C z² = 1）；
+     *   恰有两个为 0   → 再降维成坐标轴上的两个点
+     *                    （如 A=B=0, C>0：z = ±1/√C）；
+     *   三个全为 0     → 方程 0 = 1 无解，图形为空集。
+     * ================================================================ */
+    function currentMode() {
+      const zeros = (A === 0 ? 1 : 0) + (B === 0 ? 1 : 0) + (C === 0 ? 1 : 0);
+      if (zeros === 0) return 'ellipsoid'; // 三维
+      if (zeros === 1) return 'ellipse';   // 二维
+      if (zeros === 2) return 'points';    // 一维
+      return 'empty';                      // 无解
+    }
+
+    // 根据模式构建图形（返回 mesh 数组）
+    function buildShape(mode) {
+      if (mode === 'ellipsoid') {
+        // 单位球 + 半轴缩放（缩放比重新计算顶点更平滑、更高效）
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 48), surfaceMat);
+        mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(B), 1 / Math.sqrt(C));
+        return [mesh];
+      }
+      if (mode === 'ellipse') {
+        // 圆盘几何体缩放成椭圆，再旋转到对应坐标平面
+        const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 80), surfaceMat);
+        if (A === 0) {
+          // 落在 y-z 平面（法线朝 x）：圆盘 local-x 映射到 z、local-y 映射到 y
+          mesh.rotation.y = Math.PI / 2;
+          mesh.scale.set(1 / Math.sqrt(C), 1 / Math.sqrt(B), 1);
+        } else if (B === 0) {
+          // 落在 x-z 平面（法线朝 y）
+          mesh.rotation.x = Math.PI / 2;
+          mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(C), 1);
+        } else {
+          // C === 0：落在 x-y 平面（圆盘默认朝向即 x-y）
+          mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(B), 1);
+        }
+        return [mesh];
+      }
+      if (mode === 'points') {
+        // 两个点：位于唯一非零参数对应的轴上
+        const geo = new THREE.SphereGeometry(0.12, 20, 20);
+        const p1 = new THREE.Mesh(geo, surfaceMat);
+        const p2 = new THREE.Mesh(geo, surfaceMat);
+        const d = A > 0 ? 1 / Math.sqrt(A) : B > 0 ? 1 / Math.sqrt(B) : 1 / Math.sqrt(C);
+        if (A > 0) { p1.position.set(d, 0, 0); p2.position.set(-d, 0, 0); }
+        else if (B > 0) { p1.position.set(0, d, 0); p2.position.set(0, -d, 0); }
+        else { p1.position.set(0, 0, d); p2.position.set(0, 0, -d); }
+        return [p1, p2];
+      }
+      return []; // empty：空集，不渲染任何图形
+    }
+
+    // 同一模式下平滑更新（不重建几何体，避免闪烁）
+    function updateShape() {
+      const mode = currentMode();
+      if (mode === 'ellipsoid') {
+        const mesh = rotGroup.children[0];
+        mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(B), 1 / Math.sqrt(C));
+      } else if (mode === 'ellipse') {
+        const mesh = rotGroup.children[0];
+        if (A === 0) mesh.scale.set(1 / Math.sqrt(C), 1 / Math.sqrt(B), 1);
+        else if (B === 0) mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(C), 1);
+        else mesh.scale.set(1 / Math.sqrt(A), 1 / Math.sqrt(B), 1);
+      } else if (mode === 'points') {
+        const [p1, p2] = rotGroup.children;
+        const d = A > 0 ? 1 / Math.sqrt(A) : B > 0 ? 1 / Math.sqrt(B) : 1 / Math.sqrt(C);
+        if (A > 0) { p1.position.set(d, 0, 0); p2.position.set(-d, 0, 0); }
+        else if (B > 0) { p1.position.set(0, d, 0); p2.position.set(0, -d, 0); }
+        else { p1.position.set(0, 0, d); p2.position.set(0, 0, -d); }
+      }
+    }
+
+    // 透明度渐变（模式切换时的淡出 / 淡入）
+    function tweenOpacity(target, duration, onDone) {
+      const from = surfaceMat.opacity;
+      const t0 = performance.now();
+      function step(now) {
+        const t = Math.min((now - t0) / duration, 1);
+        surfaceMat.opacity = from + (target - from) * t;
+        if (t < 1) requestAnimationFrame(step);
+        else if (onDone) onDone();
+      }
+      requestAnimationFrame(step);
+    }
+
+    let swapping = false;
+    let pendingSwap = false;
+    // 模式切换：淡出 → 重建图形 → 淡入（平滑，无闪烁）
+    function swapShape() {
+      if (swapping) { pendingSwap = true; return; }
+      swapping = true;
+      tweenOpacity(0, 200, () => {
+        while (rotGroup.children.length) rotGroup.remove(rotGroup.children[0]);
+        buildShape(currentMode()).forEach((m) => rotGroup.add(m));
+        tweenOpacity(0.6, 200, () => {
+          swapping = false;
+          if (pendingSwap) { pendingSwap = false; swapShape(); } // 淡出期间参数又变：补一次切换
+        });
+      });
+    }
+
+    /* ==================== KaTeX 渲染 ==================== */
+    const matrixEl = document.getElementById('matrix-display');
+    const equationEl = document.getElementById('equation-note');
+    const rotationEl = document.getElementById('rotation-display');
+    const noteEl = document.getElementById('dimension-note');
+
+    // 主展示：对角矩阵 × 向量 = 1（A、B、C 实时变化）
+    function renderMainTex() {
+      const fa = fmt(A), fb = fmt(B), fc = fmt(C);
+      const tex = `[x,\\ y,\\ z] \\begin{bmatrix} ${fa} & 0 & 0 \\\\ 0 & ${fb} & 0 \\\\ 0 & 0 & ${fc} \\end{bmatrix} \\begin{bmatrix} x \\\\ y \\\\ z \\end{bmatrix} = 1`;
+      katex.render(tex, matrixEl, { displayMode: true, throwOnError: false });
+      // 方程说明：A x² + B y² + C z² = 1（为 0 的项省略，保持数学正确）
+      const terms = [];
+      if (A > 0) terms.push(`${fa} x^{2}`);
+      if (B > 0) terms.push(`${fb} y^{2}`);
+      if (C > 0) terms.push(`${fc} z^{2}`);
+      katex.render(terms.length ? terms.join(' + ') + ' = 1' : '0 = 1', equationEl, { displayMode: false, throwOnError: false });
+    }
+
+    // 旋转展示：R(θ)ᵀ diag(A,B,C) R(θ)（矩阵乘法带来的参数变化）
+    function renderRotationTex() {
+      if (theta === 0) {
+        rotationEl.textContent = 'θ = 0°：当前为标准形式（对角矩阵）';
+        return;
+      }
+      const c = Math.cos(theta), s = Math.sin(theta);
+      // 绕 y 轴旋转 θ 后，世界坐标下的二次型矩阵：
+      // [[A c²+C s², 0, (C-A)sc], [0, B, 0], [(C-A)sc, 0, A s²+C c²]]
+      const m11 = A * c * c + C * s * s;
+      const m13 = (C - A) * s * c;
+      const m33 = A * s * s + C * c * c;
+      const tex = `[x,\\ y,\\ z] \\begin{bmatrix} ${fmt(m11)} & 0 & ${fmt(m13)} \\\\ 0 & ${fmt(B)} & 0 \\\\ ${fmt(m13)} & 0 & ${fmt(m33)} \\end{bmatrix} \\begin{bmatrix} x \\\\ y \\\\ z \\end{bmatrix} = 1`;
+      katex.render(tex, rotationEl, { displayMode: true, throwOnError: false });
+    }
+
+    // 降维状态说明
+    function renderNote() {
+      const zeros = (A === 0 ? 1 : 0) + (B === 0 ? 1 : 0) + (C === 0 ? 1 : 0);
+      noteEl.classList.toggle('warn', zeros > 0);
+      if (zeros === 0) {
+        noteEl.textContent = `三维椭球面：半轴 1/√A ≈ ${fmt(1 / Math.sqrt(A))}，1/√B ≈ ${fmt(1 / Math.sqrt(B))}，1/√C ≈ ${fmt(1 / Math.sqrt(C))}`;
+      } else if (zeros === 1) {
+        if (A === 0) noteEl.textContent = 'A = 0：三维体消失，降维成 y-z 平面上的填充椭圆（B y² + C z² = 1）';
+        else if (B === 0) noteEl.textContent = 'B = 0：三维体消失，降维成 x-z 平面上的填充椭圆（A x² + C z² = 1）';
+        else noteEl.textContent = 'C = 0：三维体消失，降维成 x-y 平面上的填充椭圆（A x² + B y² = 1）';
+      } else if (zeros === 2) {
+        if (A > 0) noteEl.textContent = `进一步降维：退化为 x 轴上的两个点 x = ±1/√A ≈ ±${fmt(1 / Math.sqrt(A))}（秩为 1）`;
+        else if (B > 0) noteEl.textContent = `进一步降维：退化为 y 轴上的两个点 y = ±1/√B ≈ ±${fmt(1 / Math.sqrt(B))}（秩为 1）`;
+        else noteEl.textContent = `进一步降维：退化为 z 轴上的两个点 z = ±1/√C ≈ ±${fmt(1 / Math.sqrt(C))}（秩为 1）`;
+      } else {
+        noteEl.textContent = 'A = B = C = 0：方程 0 = 1 无解，图形为空集';
+      }
+    }
+
+    /* ==================== 参数变化处理 ==================== */
+    function onParamChange() {
+      valA.textContent = fmt(A);
+      valB.textContent = fmt(B);
+      valC.textContent = fmt(C);
+      renderMainTex();
+      renderNote();
+      renderRotationTex();   // 旋转矩阵也依赖 A、B、C
+      const mode = currentMode();
+      if (mode === modePrev) {
+        updateShape();        // 同模式：直接平滑更新
+      } else {
+        modePrev = mode;
+        swapShape();          // 跨模式：淡出淡入切换
+      }
+    }
+
+    /* ==================== 任意化：旋转 θ 的处理 ==================== */
+    function applyTheta() {
+      rotGroup.rotation.y = theta;
+      valTheta.textContent = Math.round(theta * 180 / Math.PI) + '°';
+      renderRotationTex();
+    }
+
+    // θ 平滑动画（随机旋转 / 回归标准时使用）
+    function tweenTheta(targetRad, duration = 700) {
+      if (thetaTweenId) cancelAnimationFrame(thetaTweenId);
+      const from = theta;
+      const t0 = performance.now();
+      function step(now) {
+        const t = Math.min((now - t0) / duration, 1);
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+        theta = from + (targetRad - from) * eased;
+        rotGroup.rotation.y = theta;
+        valTheta.textContent = Math.round(theta * 180 / Math.PI) + '°';
+        if (t < 1) thetaTweenId = requestAnimationFrame(step);
+        else renderRotationTex();
+      }
+      thetaTweenId = requestAnimationFrame(step);
+    }
+
+    /* ==================== 绑定 UI ==================== */
+    const sliderA = document.getElementById('slider-a');
+    const sliderB = document.getElementById('slider-b');
+    const sliderC = document.getElementById('slider-c');
+    const sliderTheta = document.getElementById('slider-theta');
+    const valA = document.getElementById('val-a');
+    const valB = document.getElementById('val-b');
+    const valC = document.getElementById('val-c');
+    const valTheta = document.getElementById('val-theta');
+
+    sliderA.addEventListener('input', () => { A = parseFloat(sliderA.value); onParamChange(); });
+    sliderB.addEventListener('input', () => { B = parseFloat(sliderB.value); onParamChange(); });
+    sliderC.addEventListener('input', () => { C = parseFloat(sliderC.value); onParamChange(); });
+    sliderTheta.addEventListener('input', () => { theta = parseFloat(sliderTheta.value) * Math.PI / 180; applyTheta(); });
+
+    document.getElementById('btn-random').addEventListener('click', () => {
+      tweenTheta((15 + Math.floor(Math.random() * 345)) * Math.PI / 180);
+    });
+    document.getElementById('btn-standard').addEventListener('click', () => {
+      tweenTheta(0);
+    });
+
+    // 窗口缩放自适应
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    /* ==================== 初始化与渲染循环 ==================== */
+    modePrev = currentMode();
+    buildShape(modePrev).forEach((m) => rotGroup.add(m));
+    renderMainTex();
+    renderNote();
+    renderRotationTex();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
